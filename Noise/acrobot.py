@@ -330,7 +330,6 @@ print('Complete')
 plot_durations(show_result=True)
 plt.ioff()
 plt.show()
-plt.savefig('./plots/acropole.png')
 
 """Here is the diagram that illustrates the overall resulting data flow.
 
