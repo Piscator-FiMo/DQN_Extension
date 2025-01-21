@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "DQN_Extension"
+version = "0.1.0"
+description = ""
+authors = ["Gerber Florian", "Genecand Vincent", "Jungen Björn", "Stevanovski Angelina", "Fischer Moritz"]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+gymnasium = {extras = ["other"], version = "^1.0.0"}
+numpy = "^2.2.1"
+torch = {version = "^2.5.1+cu124", source = "pytorch_cuda"}
+matplotlib = "^3.10.0"
+pygame = "^2.6.1"
+ipython = "^8.31.0"
+
+[[tool.poetry.source]]
+name = "pytorch_cuda"
+url = "https://download.pytorch.org/whl/cu124"
+priority = "explicit"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
