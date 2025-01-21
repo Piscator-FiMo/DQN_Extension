@@ -244,7 +244,7 @@ for i_episode in range(episodes):
             if i_episode % 100 == 0:
                 plot_durations()
             break
-
+env.close()
 print('Complete')
 plot_durations(show_result=True)
 plt.ioff()

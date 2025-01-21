@@ -13,7 +13,8 @@ import torch.nn.functional as F
 from gymnasium.wrappers import RecordVideo
 
 episodes = 700
-env = RecordVideo(env=gym.make("Acrobot-v1", render_mode="rgb_array"), video_folder="./noisy_arcobot", episode_trigger=lambda x: x > 150 and  (x % 20 == 0 or x >= episodes - 10), fps=12)
+env = RecordVideo(env=gym.make("Acrobot-v1", render_mode="rgb_array"), video_folder="./dueling_arcobot", episode_trigger=lambda x: x > 150 and  (x % 20 == 0 or x >= episodes - 10), fps=12)
+
 
 # set up matplotlib
 is_ipython = 'inline' in matplotlib.get_backend()
@@ -48,46 +49,33 @@ class ReplayMemory(object):
     def __len__(self):
         return len(self.memory)
 
-class NoisyLinear(nn.Linear):
-    def __init__(self, in_features, out_features, sigma_init=0.017, bias=True):
-        super(NoisyLinear, self).__init__(in_features, out_features, bias=bias)
-        self.sigma_weight = nn.Parameter(torch.full((out_features, in_features), sigma_init))
-        self.register_buffer("epsilon_weight", torch.zeros(out_features, in_features))
-        if bias:
-            self.sigma_bias = nn.Parameter(torch.full((out_features,), sigma_init))
-            self.register_buffer("epsilon_bias", torch.zeros(out_features))
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        std = math.sqrt(3 / self.in_features)
-        self.weight.data.uniform_(-std, std)
-        self.bias.data.uniform_(-std, std)
-
-    def forward(self, input):
-        self.epsilon_weight.normal_()
-        bias = self.bias
-        if bias is not None:
-            self.epsilon_bias.normal_()
-            bias = bias + self.sigma_bias * self.epsilon_bias.data
-        return F.linear(input, self.weight + self.sigma_weight * self.epsilon_weight.data, bias)
-
 class DQN(nn.Module):
 
     def __init__(self, n_observations, n_actions):
         super(DQN, self).__init__()
         self.layer1 = nn.Linear(n_observations, 128)
-        self.layer2 = nn.Linear(128, 512)
-        self.layer3 = NoisyLinear(512, 512, sigma_init=0.1)
-        self.layer4 = nn.Linear(512, n_actions)
+        self.layer2 = nn.Linear(128, 128)
+
+        self.fc_adv = nn.Sequential(
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, n_actions)
+        )
+        self.fc_val = nn.Sequential(
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, 1)
+        )
 
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
     def forward(self, x):
         x = F.relu(self.layer1(x))
         x = F.relu(self.layer2(x))
-        x = F.relu(self.layer3(x))
-        return self.layer4(x)
 
+        val = self.fc_val(x)
+        adv = self.fc_adv(x)
+        return val + adv - adv.mean() # ist gleich Q Value
 # BATCH_SIZE is the number of transitions sampled from the replay buffer
 # GAMMA is the discount factor as mentioned in the previous section
 # EPS_START is the starting value of epsilon
@@ -122,13 +110,18 @@ steps_done = 0
 
 def select_action(state):
     global steps_done
+    sample = random.random()
+    eps_threshold = EPS_END + (EPS_START - EPS_END) * \
+        math.exp(-1. * steps_done / EPS_DECAY)
     steps_done += 1
-
-    with torch.no_grad():
-        # t.max(1) will return the largest column value of each row.
-        # second column on max result is index of where max element was
-        # found, so we pick action with the larger expected reward.
-        return policy_net(state).max(1).indices.view(1, 1)
+    if sample > eps_threshold:
+        with torch.no_grad():
+            # t.max(1) will return the largest column value of each row.
+            # second column on max result is index of where max element was
+            # found, so we pick action with the larger expected reward.
+            return policy_net(state).max(1).indices.view(1, 1)
+    else:
+        return torch.tensor([[env.action_space.sample()]], device=device, dtype=torch.long)
 
 episode_durations = []
 
@@ -157,6 +150,7 @@ def plot_durations(show_result=False):
             display.clear_output(wait=True)
         else:
             display.display(plt.gcf())
+
 def optimize_model():
     if len(memory) < BATCH_SIZE:
         return
@@ -203,8 +197,6 @@ def optimize_model():
     torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
     optimizer.step()
 
-
-
 for i_episode in range(episodes):
     # Initialize the environment and get its state
     print(f"episode: {i_episode}")
@@ -244,9 +236,9 @@ for i_episode in range(episodes):
             if i_episode % 100 == 0:
                 plot_durations()
             break
-env.close()
+
 print('Complete')
+env.close()
 plot_durations(show_result=True)
 plt.ioff()
 plt.show()
-
