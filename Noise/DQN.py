@@ -105,16 +105,37 @@ class DQN(nn.Module):
 
         self.layerNoise = NoisyLinear(n_observations, 128, sigma_init=0.1)
         self.layer4 = nn.Linear(512, n_actions)
+        self.layer5 = nn.Linear(128, 128)
 
-    # Called with either one element to determine next action, or a batch
-    # during optimization. Returns tensor([[left0exp,right0exp]...]).
-    def forward(self, x):
+        self.fc_adv = nn.Sequential(
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, n_actions)
+        )
+        self.fc_val = nn.Sequential(
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, 1)
+        )
+
+    # Without Noise
+    def forward1(self, x):
         x = F.relu(self.layer1(x))
         x = F.relu(self.layer2(x))
         return self.layer4(x)
 
+    # Noisy
     def forward2(self, x):
         x = F.relu(self.layerNoise(x))
         x = F.relu(self.layer2(x))
         x = F.relu(self.layer4(x))
         return x
+
+    # Dueling
+    def forward(self, x):
+        x = F.relu(self.layer1(x))
+        x = F.relu(self.layer5(x))
+
+        val = self.fc_val(x)
+        adv = self.fc_adv(x)
+        return val + adv - adv.mean()

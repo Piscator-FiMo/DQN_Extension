@@ -154,7 +154,7 @@ LR = 1e-4
 #Create ENV
 #env = gym.make("CartPole-v1")
 episodes = 500
-env = RecordVideo(env=gym.make("CartPole-v1", render_mode="rgb_array"), video_folder="./noise-training", episode_trigger=lambda x: x % 20 == 0 and x > 0 or x >= episodes - 10, fps=12)
+env = RecordVideo(env=gym.make("Acrobot-v1", render_mode="rgb_array"), video_folder="./acrobot-training", episode_trigger=lambda x: x % 20 == 0 and x > 0 or x >= episodes - 10, fps=12)
 
 
 # Get number of actions from gym action space
